@@ -4,6 +4,7 @@ bin-debug/
 bin-release/
 [Oo]bj/
 [Bb]in/
+modularpm-hardware-test/
 
 # Other files and folders
 .settings/
