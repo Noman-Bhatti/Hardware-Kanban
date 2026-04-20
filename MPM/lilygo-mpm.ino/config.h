@@ -7,7 +7,7 @@
 // API
 #define API_BASE_URL      "https://api.modularpm.co.uk"
 #define DEVICE_ID         "eink-tag-001"
-#define DEVICE_TOKEN "d16b0c57381cd0492c152d7ea22165df92bcdf5a1aaeb23fdfb5d29196d6cbdd"
+#define DEVICE_TOKEN "6a542a3d28ded41b7e127efd9fcded1e119deea6dc97428926bbd90d5d5f9bf8"
 
 // Timing
 #define POLL_INTERVAL_MS  300000   // 5 min task refresh
