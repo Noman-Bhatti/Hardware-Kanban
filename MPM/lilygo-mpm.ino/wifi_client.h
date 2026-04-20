@@ -6,6 +6,8 @@
 #include <ArduinoJson.h>
 #include "config.h"
 
+// WiFi ---------------------------------
+
 bool connectWifi() {
   Serial.print("Connecting to WiFi");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -26,50 +28,85 @@ bool connectWifi() {
   return false;
 }
 
-bool fetchTask(String &title, String &columnName) {
-  if (WiFi.status() != WL_CONNECTED) return false;
+// Shared HTTP helper ---------------------------------
 
-  WiFiClientSecure client;
-  client.setInsecure();  // Skip SSL cert verification for now
+WiFiClientSecure _secureClient;
 
+HTTPClient _beginRequest(String path) {
+  _secureClient.setInsecure();
   HTTPClient http;
-  String url = String(API_BASE_URL) + "/api/devices/" + DEVICE_ID + "/task";
-  http.begin(client, url);
+  http.begin(_secureClient, String(API_BASE_URL) + path);
   http.addHeader("Authorization", "Bearer " DEVICE_TOKEN);
   http.addHeader("Content-Type", "application/json");
+  return http;
+}
 
-  int code = http.GET();
-  Serial.println("GET task status: " + String(code));
+// Wake - call on every boot  ---------------------------------
+// Returns PIN string, or "" on failure
+
+String wakeDevice() {
+  HTTPClient http = _beginRequest("/api/devices/" DEVICE_ID "/wake");
+
+  int code = http.POST("");
+  Serial.println("Wake status: " + String(code));
 
   if (code == 200) {
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, http.getString());
     if (!err) {
-      title      = doc["title"].as<String>();
-      columnName = doc["column_name"].as<String>();
+      String pin = doc["data"]["pin"].as<String>();
       http.end();
-      return true;
+      return pin;
     }
-    Serial.println("JSON parse error: " + String(err.c_str()));
   } else {
-    Serial.println("Response: " + http.getString());
+    Serial.println("Wake response: " + http.getString());
   }
 
   http.end();
-  return false;
+  return "";
 }
 
+// Status poll ---------------------------------
+// Returns: 0 = not paired, 1 = paired + task loaded, -1 = error
+
+int pollStatus(String &title, String &columnName) {
+  HTTPClient http = _beginRequest("/api/devices/" DEVICE_ID "/status");
+
+  int code = http.GET();
+  Serial.println("Status poll: " + String(code));
+
+  if (code == 200) {
+    String raw = http.getString();
+    Serial.println("Status response: " + raw);
+    http.end();
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, raw);
+    if (err) return -1;
+
+    bool paired = doc["paired"] | false;
+    if (!paired) return 0;
+
+    // paired but no task yet (all tasks done or none assigned)
+    if (doc["task"].isNull()) {
+      title = "";
+      columnName = "";
+      return 1;
+    }
+
+    title      = doc["task"]["title"].as<String>();
+    columnName = doc["task"]["column_name"].as<String>();
+    return 1;
+  }
+
+  http.end();
+  return -1;
+}
+
+// Update column (BLE phase) ---------------------------------
+
 bool updateColumn(String columnName) {
-  if (WiFi.status() != WL_CONNECTED) return false;
-
-  WiFiClientSecure client;
-  client.setInsecure();
-
-  HTTPClient http;
-  String url = String(API_BASE_URL) + "/api/devices/" + DEVICE_ID + "/task";
-  http.begin(client, url);
-  http.addHeader("Authorization", "Bearer " DEVICE_TOKEN);
-  http.addHeader("Content-Type", "application/json");
+  HTTPClient http = _beginRequest("/api/devices/" DEVICE_ID "/task");
 
   JsonDocument doc;
   doc["column_name"] = columnName;
@@ -77,8 +114,7 @@ bool updateColumn(String columnName) {
   serializeJson(doc, body);
 
   int code = http.PATCH(body);
-  Serial.println("PATCH column status: " + String(code));
-  Serial.println("Response: " + http.getString());
+  Serial.println("PATCH column: " + String(code));
 
   http.end();
   return (code == 200);

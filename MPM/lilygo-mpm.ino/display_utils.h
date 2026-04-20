@@ -97,3 +97,22 @@ void renderMessage(String line1, String line2 = "") {
     }
   } while (display.nextPage());
 }
+
+void renderPin(String pin) {
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+    display.setFont(&FreeMono9pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    display.setCursor(PADDING, 24);
+    display.print("Pair this device");
+    display.setCursor(PADDING, 44);
+    display.print("Go to ModularPM");
+    display.setCursor(PADDING, 64);
+    display.print("Enter PIN:");
+
+    display.setFont(&FreeMonoBold9pt7b);
+    display.setCursor(PADDING, 90);
+    display.print(pin);
+  } while (display.nextPage());
+}
